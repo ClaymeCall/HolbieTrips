@@ -35,12 +35,12 @@ const opened: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close())); });
 
 describe('A01 — Boarding Pass Mix-Up', () => {
-  it('caractérise la faille active : Alice peut lire la réservation de Bruno', async () => {
+  it('régression : Alice ne peut plus lire la réservation de Bruno', async () => {
     const app = await buildApp(fakePool() as unknown as Pool, { serveFrontend: false });
     opened.push(app);
     const response = await app.inject({ method: 'GET', url: `/api/bookings/${BRUNO_BOOKING}`, headers: { authorization: 'Bearer alice-session' } });
-    expect(response.statusCode).toBe(200);
-    expect(response.json().booking.itinerary_notes).toMatch(/FLAG\{a01_[a-f0-9]{24}\}/);
+    expect(response.statusCode).toBe(404);
+    expect(response.json().booking?.itinerary_notes).toBeUndefined();
   });
 
   it('préserve le parcours positif : Alice peut lire sa propre réservation', async () => {
