@@ -42,7 +42,7 @@ describe('A02 — The Debug Desk Left Open', () => {
     });
 
     expect(response.statusCode).toBe(403);
-    expect(response.headers['x-holbietrips-debug-desk']).toBe('/api/support/diagnostics');
+    expect(response.headers['x-holbietrips-debug-desk']).toBeUndefined();
   });
 
   it('preserves the intended support journey while the desk is enabled', async () => {
@@ -57,6 +57,7 @@ describe('A02 — The Debug Desk Left Open', () => {
 
     expect(response.statusCode).toBe(200);
     expect(response.json().intendedAudience).toBe('support');
+    expect(response.headers['x-holbietrips-debug-desk']).toBe('/api/support/diagnostics');
   });
 
   it('keeps the public trip catalogue available when diagnostics are disabled', async () => {

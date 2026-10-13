@@ -22,7 +22,7 @@ export type BuildOptions = {
 
 /** Adds response headers that apply consistently to API and frontend traffic. */
 function registerResponseHeaders(app: FastifyInstance, diagnosticsEnabled: boolean): void {
-  app.addHook('onSend', async (_request, reply, payload) => {
+  app.addHook('onSend', async (request, reply, payload) => {
     reply.headers({
       'content-security-policy': "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
       'x-content-type-options': 'nosniff',
@@ -30,7 +30,7 @@ function registerResponseHeaders(app: FastifyInstance, diagnosticsEnabled: boole
       'referrer-policy': 'no-referrer',
       'permissions-policy': 'camera=(), microphone=(), geolocation=()'
     });
-    if (diagnosticsEnabled) {
+    if (diagnosticsEnabled && request.authUser?.role === 'support') {
       reply.header('x-holbietrips-debug-desk', '/api/support/diagnostics');
     }
     return payload;
