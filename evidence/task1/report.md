@@ -15,10 +15,12 @@ Every API response carries an `x-holbietrips-debug-desk: /api/support/diagnostic
 
 `GET /api/support/diagnostics` (`apps/api/src/routes/system.ts`) is registered with `{ preHandler: context.requireUser }`, which only checks that *some* session is authenticated — it never checks the caller's `role`. Every other support-only route in the codebase (`PATCH /api/support/tickets/:id`, `GET /api/audit` in `apps/api/src/routes/support.ts`) uses `context.requireRole('support')` instead, so this route is the one inconsistent case: a Security Misconfiguration where a sensitive, staff-only endpoint was wired up with the generic "logged in" guard rather than the staff role guard that already existed and is used elsewhere. The leaked `x-holbietrips-debug-desk` response header (`apps/api/src/app.ts`) then makes the endpoint trivially discoverable to any client.
 
-## Remediation (suggested — not yet applied)
+## Remediation
 
-- Change the preHandler on `GET /api/support/diagnostics` from `context.requireUser` to `context.requireRole('support')`, matching the pattern already used for `/api/audit` and `/api/support/tickets/:id`. This keeps the endpoint available to support staff while returning `403` for any authenticated non-support caller (and `401` for anonymous callers).
-- Update the characterization test in `tests/api/a02-security-misconfiguration.test.ts` so the first case asserts `403` for the customer instead of `200` with the flag, once the role check is added.
+- `GET /api/support/diagnostics` (`apps/api/src/routes/system.ts`) now uses `context.requireRole('support')` instead of `context.requireUser`, matching the pattern already used for `/api/audit` and `/api/support/tickets/:id`. The endpoint stays available to support staff while returning `403` for any authenticated non-support caller (and `401` for anonymous callers).
+- `SUPPORT_DIAGNOSTICS_ENABLED` now defaults to `false` in the deployment configuration (`compose.yaml`, `.env.example`); the route must be explicitly opted into per-environment rather than shipping on by default.
+- The `x-holbietrips-debug-desk` discovery header (`apps/api/src/app.ts`) is now only attached when the caller is authenticated as `support`, so the route is no longer advertised to customers or anonymous visitors.
+- The characterization test in `tests/api/a02-security-misconfiguration.test.ts` was converted into a regression test: a customer now gets `403` with no discovery header, while a support user still gets `200` with the header present.
 
 ## Verification
 
