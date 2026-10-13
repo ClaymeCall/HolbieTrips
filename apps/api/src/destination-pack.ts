@@ -19,7 +19,7 @@ export async function loadDestinationPack(file: string, expectedSha256: string) 
       algorithm: 'sha256',
       expected: expectedSha256,
       calculated: calculatedSha256,
-      accepted: true
+      accepted: expectedSha256 === calculatedSha256
     }
   };
 }

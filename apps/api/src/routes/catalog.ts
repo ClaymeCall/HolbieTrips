@@ -17,10 +17,21 @@ export function registerCatalogRoutes(app: FastifyInstance, context: RouteContex
           : destination
       ));
     }
+
+    if (!loaded.integrity.accepted) {
+      throw new Error('Destination pack failed integrity verification');
+    }
+
     return loaded;
   };
 
-  app.get('/api/destination-pack', async () => getDestinationPack());
+  app.get('/api/destination-pack', async (request, reply) => {
+    try {
+      return await getDestinationPack();
+    } catch {
+      return reply.code(503).send({ error: 'Destination pack unavailable' });
+    }
+  });
 
   app.get('/api/trips', async (request, reply) => {
     const query = readText((request.query as RequestBody).q, 100);
@@ -38,8 +49,14 @@ export function registerCatalogRoutes(app: FastifyInstance, context: RouteContex
        ORDER BY departure_date`
     );
 
-    const { pack } = await getDestinationPack();
-    const tips = new Map(pack.destinations.map(destination => [destination.slug, destination.travelTip]));
+    let tips = new Map<string, string>();
+    try {
+      const { pack } = await getDestinationPack();
+      tips = new Map(pack.destinations.map(destination => [destination.slug, destination.travelTip]));
+    } catch {
+      return reply.code(503).send({ error: 'Destination pack unavailable' });
+    }
+
     return {
       trips: result.rows.map(trip => ({
         ...trip,
