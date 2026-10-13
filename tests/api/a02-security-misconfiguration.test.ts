@@ -31,7 +31,7 @@ const opened: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close())); });
 
 describe('A02 — The Debug Desk Left Open', () => {
-  it('characterizes the active flaw: a customer can open the support diagnostics desk', async () => {
+  it('denies a customer access to the support diagnostics desk', async () => {
     const app = await buildApp(fakePool(customer) as unknown as Pool, { serveFrontend: false, diagnosticsEnabled: true });
     opened.push(app);
 
@@ -41,9 +41,8 @@ describe('A02 — The Debug Desk Left Open', () => {
       headers: { authorization: 'Bearer customer-session' }
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(403);
     expect(response.headers['x-holbietrips-debug-desk']).toBe('/api/support/diagnostics');
-    expect(response.json().flag).toMatch(/^FLAG\{a02_[a-f0-9]{24}\}$/);
   });
 
   it('preserves the intended support journey while the desk is enabled', async () => {
