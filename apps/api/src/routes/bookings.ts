@@ -150,21 +150,18 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
     );
     if (!result.rowCount) return reply.code(404).send({ error: 'Réservation introuvable' });
 
-    let checksPassed = false;
+    let checksPassed: boolean;
     try {
       if (simulateFailure) throw new Error('Local readiness checker unavailable');
       checksPassed = result.rows[0].status === 'pending' && result.rows[0].payment_status === 'approved';
     } catch {
-      checksPassed = false;
+      return reply.code(503).send({ error: 'Vérification de la réservation indisponible' });
     }
 
     if (!checksPassed) {
       return reply.code(409).send({ error: 'La réservation ne peut pas encore être confirmée' });
     }
     await pool.query(`UPDATE bookings SET status='confirmed' WHERE id=$1`, [id]);
-    return {
-      status: 'confirmed',
-      ...(simulateFailure ? { flag: flags.get('A10') } : {})
-    };
+    return { status: 'confirmed' };
   });
 }

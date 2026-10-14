@@ -17,12 +17,13 @@ const opened: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close())); });
 
 describe('A10 — The Emergency Exit Is Open', () => {
-  it('refuses to confirm when the mandatory check is unavailable instead of failing open', async () => {
+  it('returns 503 and leaves the booking untouched when the readiness check is unavailable', async () => {
     const pool = fakePool({ status: 'pending', payment_status: 'approved' });
     const app = await buildApp(pool as unknown as Pool, { serveFrontend: false }); opened.push(app);
     const response = await app.inject({ method: 'POST', url: '/api/bookings/40000000-0000-4000-8000-000000000001/confirm', headers: { authorization: 'Bearer alice' }, payload: { simulateCheckFailure: true } });
-    expect(response.statusCode).toBe(409);
+    expect(response.statusCode).toBe(503);
     expect(response.body).not.toContain('FLAG{');
+    expect(pool.query.mock.calls.some(([sql]) => String(sql).includes("UPDATE bookings SET status='confirmed'"))).toBe(false);
   });
 
   it('preserves the normal rejection when payment is missing', async () => {
@@ -32,7 +33,7 @@ describe('A10 — The Emergency Exit Is Open', () => {
     expect(response.body).not.toContain('FLAG{');
   });
 
-  it('confirms the booking when the readiness check genuinely passes', async () => {
+  it('confirms the booking when payment is approved and the check succeeds', async () => {
     const app = await buildApp(fakePool({ status: 'pending', payment_status: 'approved' }) as unknown as Pool, { serveFrontend: false }); opened.push(app);
     const response = await app.inject({ method: 'POST', url: '/api/bookings/40000000-0000-4000-8000-000000000001/confirm', headers: { authorization: 'Bearer alice' }, payload: {} });
     expect(response.statusCode).toBe(200);
