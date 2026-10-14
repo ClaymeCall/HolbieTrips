@@ -155,7 +155,7 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
       if (simulateFailure) throw new Error('Local readiness checker unavailable');
       checksPassed = result.rows[0].status === 'pending' && result.rows[0].payment_status === 'approved';
     } catch {
-      checksPassed = true;
+      checksPassed = false;
     }
 
     if (!checksPassed) {

@@ -4,10 +4,10 @@ import { buildApp } from '../../apps/api/src/app';
 
 const alice = { id: '10000000-0000-4000-8000-000000000001', email: 'alice.martin@example.test', full_name: 'Alice Martin', role: 'customer' };
 
-function fakePool() {
+function fakePool(bookingRow: { status: string; payment_status: string | null }) {
   return { query: vi.fn(async (sql: string) => {
     if (sql.includes('FROM sessions')) return { rowCount: 1, rows: [alice] };
-    if (sql.includes('SELECT b.id,b.status')) return { rowCount: 1, rows: [{ id: 'booking', status: 'pending', payment_status: null }] };
+    if (sql.includes('SELECT b.id,b.status')) return { rowCount: 1, rows: [{ id: 'booking', ...bookingRow }] };
     if (sql.includes("UPDATE bookings SET status='confirmed'")) return { rowCount: 1, rows: [] };
     throw new Error(`Unexpected query: ${sql}`);
   }), end: vi.fn(async () => undefined) };
@@ -17,17 +17,25 @@ const opened: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close())); });
 
 describe('A10 — The Emergency Exit Is Open', () => {
-  it('characterizes the flaw: an unavailable mandatory check confirms the booking', async () => {
-    const pool = fakePool(); const app = await buildApp(pool as unknown as Pool, { serveFrontend: false }); opened.push(app);
+  it('refuses to confirm when the mandatory check is unavailable instead of failing open', async () => {
+    const pool = fakePool({ status: 'pending', payment_status: 'approved' });
+    const app = await buildApp(pool as unknown as Pool, { serveFrontend: false }); opened.push(app);
     const response = await app.inject({ method: 'POST', url: '/api/bookings/40000000-0000-4000-8000-000000000001/confirm', headers: { authorization: 'Bearer alice' }, payload: { simulateCheckFailure: true } });
-    expect(response.statusCode).toBe(200);
-    expect(response.json().flag).toMatch(/^FLAG\{a10_[a-f0-9]{24}\}$/);
+    expect(response.statusCode).toBe(409);
+    expect(response.body).not.toContain('FLAG{');
   });
 
   it('preserves the normal rejection when payment is missing', async () => {
-    const app = await buildApp(fakePool() as unknown as Pool, { serveFrontend: false }); opened.push(app);
+    const app = await buildApp(fakePool({ status: 'pending', payment_status: null }) as unknown as Pool, { serveFrontend: false }); opened.push(app);
     const response = await app.inject({ method: 'POST', url: '/api/bookings/40000000-0000-4000-8000-000000000001/confirm', headers: { authorization: 'Bearer alice' }, payload: {} });
     expect(response.statusCode).toBe(409);
     expect(response.body).not.toContain('FLAG{');
+  });
+
+  it('confirms the booking when the readiness check genuinely passes', async () => {
+    const app = await buildApp(fakePool({ status: 'pending', payment_status: 'approved' }) as unknown as Pool, { serveFrontend: false }); opened.push(app);
+    const response = await app.inject({ method: 'POST', url: '/api/bookings/40000000-0000-4000-8000-000000000001/confirm', headers: { authorization: 'Bearer alice' }, payload: {} });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'confirmed' });
   });
 });
