@@ -28,6 +28,8 @@ describe('A03 — The Mystery Destination Pack', () => {
     const response = await app.inject({ method: 'GET', url: '/api/destination-pack' });
     expect(response.statusCode).toBe(503);
     expect(response.body).not.toMatch(/FLAG\{a03_[a-f0-9]{24}\}/);
+    expect(response.json()).not.toHaveProperty('destinations');
+    expect(response.body).not.toContain('altered destination pack');
     await app.close();
   });
 
