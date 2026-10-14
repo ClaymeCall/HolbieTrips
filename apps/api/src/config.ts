@@ -23,6 +23,5 @@ export const config = {
   sessionHours: Number(process.env.SESSION_TTL_HOURS ?? 8),
   supportDiagnosticsEnabled: enabled('SUPPORT_DIAGNOSTICS_ENABLED'),
   destinationPackFile: required('DESTINATION_PACK_FILE', `${process.cwd()}/database/fixtures/destination-pack-approved.json`),
-  destinationPackSha256: required('DESTINATION_PACK_SHA256', '78f5ba6c78041a2f7cff89ad032c5df7a5a03c9dddbe63150d7ca2d23be4bc93'),
-  passportProtectionMode: required('PASSPORT_PROTECTION_MODE', 'legacy-base64')
+  destinationPackSha256: required('DESTINATION_PACK_SHA256', '78f5ba6c78041a2f7cff89ad032c5df7a5a03c9dddbe63150d7ca2d23be4bc93')
 };

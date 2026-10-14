@@ -49,7 +49,7 @@ export function registerProfileRoutes(app: FastifyInstance, context: RouteContex
     const body = request.body as RequestBody;
     const passportNumber = readText(body.passportNumber, 30);
     const protectedPassport = passportNumber
-      ? protectPassport(passportNumber, settings.encryptionKey, settings.passportProtectionMode)
+      ? protectPassport(passportNumber, settings.encryptionKey)
       : { ciphertext: null, iv: null, tag: null };
 
     await pool.query(
