@@ -12,15 +12,22 @@ const alice = {
   role: 'customer'
 };
 
+const support = {
+  id: '10000000-0000-4000-8000-000000000099',
+  email: 'support@holbietrips.test',
+  full_name: 'Support HolbieTrips',
+  role: 'support'
+};
+
 const bookings = new Map([
   [ALICE_BOOKING, { id: ALICE_BOOKING, user_id: alice.id, reference: 'HT-ALICE-001', itinerary_notes: 'Transfert vers l’hôtel inclus.' }],
   [BRUNO_BOOKING, { id: BRUNO_BOOKING, user_id: '10000000-0000-4000-8000-000000000002', reference: 'HT-BRUNO-001', itinerary_notes: 'Cabine 12, pont Panorama.' }]
 ]);
 
-function fakePool() {
+function fakePool(sessionUser: typeof alice | typeof support) {
   return {
     query: vi.fn(async (sql: string, params: unknown[] = []) => {
-      if (sql.includes('FROM sessions')) return { rowCount: 1, rows: [alice] };
+      if (sql.includes('FROM sessions')) return { rowCount: 1, rows: [sessionUser] };
       if (sql.includes('FROM bookings b') && sql.includes('WHERE b.id=$1')) {
         const booking = bookings.get(String(params[0]));
         return { rowCount: booking ? 1 : 0, rows: booking ? [booking] : [] };
@@ -36,18 +43,27 @@ afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close(
 
 describe('A01 — Boarding Pass Mix-Up', () => {
   it('régression : Alice ne peut plus lire la réservation de Bruno', async () => {
-    const app = await buildApp(fakePool() as unknown as Pool, { serveFrontend: false });
+    const app = await buildApp(fakePool(alice) as unknown as Pool, { serveFrontend: false });
     opened.push(app);
     const response = await app.inject({ method: 'GET', url: `/api/bookings/${BRUNO_BOOKING}`, headers: { authorization: 'Bearer alice-session' } });
     expect(response.statusCode).toBe(404);
     expect(response.json().booking?.itinerary_notes).toBeUndefined();
+    expect(response.body).not.toContain('FLAG{');
   });
 
   it('préserve le parcours positif : Alice peut lire sa propre réservation', async () => {
-    const app = await buildApp(fakePool() as unknown as Pool, { serveFrontend: false });
+    const app = await buildApp(fakePool(alice) as unknown as Pool, { serveFrontend: false });
     opened.push(app);
     const response = await app.inject({ method: 'GET', url: `/api/bookings/${ALICE_BOOKING}`, headers: { authorization: 'Bearer alice-session' } });
     expect(response.statusCode).toBe(200);
     expect(response.json().booking.reference).toBe('HT-ALICE-001');
+  });
+
+  it('préserve l’accès légitime du support à la réservation de Bruno', async () => {
+    const app = await buildApp(fakePool(support) as unknown as Pool, { serveFrontend: false });
+    opened.push(app);
+    const response = await app.inject({ method: 'GET', url: `/api/bookings/${BRUNO_BOOKING}`, headers: { authorization: 'Bearer support-session' } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().booking.reference).toBe('HT-BRUNO-001');
   });
 });
