@@ -23,12 +23,12 @@ try {
 }
 ```
 
-Any exception from the check — a simulated outage here, but equally a real database or dependency failure in production — bypassed the business rule entirely instead of blocking the state transition.
+Any exception from the check — a simulated outage here, but equally a real database or dependency failure in production — bypassed the business rule entirely instead of blocking the state transition, and was indistinguishable from a normal business rejection (missing payment).
 
 ## Remediation
 
-- `apps/api/src/routes/bookings.ts`: the `catch` block now sets `checksPassed = false`, so an unavailable or failing readiness check blocks confirmation (`409`) instead of approving it. The booking only moves to `confirmed` when the check genuinely ran and passed.
-- The characterization test in `tests/api/a10-exceptional-conditions.test.ts` was converted into a regression test: a simulated check failure now asserts `409` and no flag in the body. A new business test was added to cover the previously-missing positive path — a genuine readiness-check pass still confirms the booking (`200`) — alongside the existing test that preserves the normal rejection when payment is missing.
+- `apps/api/src/routes/bookings.ts`: the handler now separates the two failure modes instead of collapsing them into one boolean. When the readiness check itself throws (unavailable), the `catch` responds `503` immediately and never reaches the `UPDATE` — the booking is left in its previous state. When the check runs successfully but the business rule fails (e.g. payment missing), it still responds `409`. The booking only moves to `confirmed` when the check genuinely ran and passed.
+- The characterization test in `tests/api/a10-exceptional-conditions.test.ts` was converted into a regression test: a simulated check failure now asserts `503`, no flag in the body, and that no `UPDATE bookings SET status='confirmed'` call ever happened. The existing test preserving the normal `409` rejection when payment is missing was kept, and a new business test was added for the previously-missing positive path — payment approved and the check succeeding confirms the booking (`200`).
 
 ## Verification
 
