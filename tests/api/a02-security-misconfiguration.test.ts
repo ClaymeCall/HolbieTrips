@@ -43,6 +43,7 @@ describe('A02 — The Debug Desk Left Open', () => {
 
     expect(response.statusCode).toBe(403);
     expect(response.headers['x-holbietrips-debug-desk']).toBeUndefined();
+    expect(response.body).not.toContain('FLAG{');
   });
 
   it('preserves the intended support journey while the desk is enabled', async () => {
