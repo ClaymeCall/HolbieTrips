@@ -20,6 +20,7 @@ Every API response carries an `x-holbietrips-debug-desk: /api/support/diagnostic
 - `GET /api/support/diagnostics` (`apps/api/src/routes/system.ts`) now uses `context.requireRole('support')` instead of `context.requireUser`, matching the pattern already used for `/api/audit` and `/api/support/tickets/:id`. The endpoint stays available to support staff while returning `403` for any authenticated non-support caller (and `401` for anonymous callers).
 - `SUPPORT_DIAGNOSTICS_ENABLED` now defaults to `false` in the deployment configuration (`compose.yaml`, `.env.example`); the route must be explicitly opted into per-environment rather than shipping on by default.
 - The `x-holbietrips-debug-desk` discovery header (`apps/api/src/app.ts`) is now only attached when the caller is authenticated as `support`, so the route is no longer advertised to customers or anonymous visitors.
+- The `flag: context.flags.get('A02')` field was removed from the diagnostics response (`apps/api/src/routes/system.ts`): now that the role check actually gates the route, there is no remaining reason for a solved-challenge marker to still ship in a legitimate support response.
 - The characterization test in `tests/api/a02-security-misconfiguration.test.ts` was converted into a regression test: a customer now gets `403`, with no discovery header and no flag in the body, while a support user still gets `200` with the header present.
 
 ## Verification

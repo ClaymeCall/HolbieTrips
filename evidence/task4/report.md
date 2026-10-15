@@ -63,6 +63,7 @@ This is a classic SQL Injection (CWE-89): the `;` check only defends against sta
   ```
   The database driver now binds `values[0]` as a literal string value for the `ILIKE` comparison — it can never be interpreted as SQL syntax, so closing quotes, `OR 1=1`, and `--` comments in `q` are all treated as ordinary search text with no matches, rather than altering the query's structure.
 - The now-redundant `query.includes(';')` guard was removed: it only ever blocked stacked statements, a narrower attack this fix already closes by construction, and it added no protection against the boolean/comment-based bypass described above.
+- Removed the dead branch in `GET /api/trips` (`apps/api/src/routes/catalog.ts`) that appended `flags.get('A05')` to the `archive-search-party` trip's description: that trip is unpublished, the query is now bound as a literal value, and `result.rows` is always filtered by `WHERE is_published=true`, so the row — and the flag text — can never appear in a response again.
 - The characterization test in `tests/api/a05-injection.test.ts` was converted into a regression test: sending `q=x') OR 1=1--` now returns `200` with no flag in the body, and the test asserts the SQL text sent to the driver never contains `1=1` while the bound value is exactly the literal, unmodified search pattern. The existing ordinary-search test (`q=Kyoto` still matches published trips) was preserved unchanged.
 
 ## Verification

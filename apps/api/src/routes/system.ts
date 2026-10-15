@@ -24,7 +24,6 @@ export function registerSystemRoutes(
       paymentSimulator: 'fake-payment:8081',
       mailSimulator: 'fake-mail:8082'
     },
-    operatorNote: 'If a customer can read this, the Debug Desk was left open.',
-    flag: context.flags.get('A02')
+    operatorNote: 'If a customer can read this, the Debug Desk was left open.'
   }));
 }

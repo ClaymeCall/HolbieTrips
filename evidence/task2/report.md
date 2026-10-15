@@ -19,6 +19,7 @@ The API serves a third-party "destination pack" (supplier-provided travel conten
 - `loadDestinationPack()` (`apps/api/src/destination-pack.ts`) now sets `integrity.accepted = (calculatedSha256 === expectedSha256)`, so the flag correctly reflects whether the file matches the approved digest.
 - `getDestinationPack()` (`apps/api/src/routes/catalog.ts`) now throws when `integrity.accepted` is `false`; both `GET /api/destination-pack` and `GET /api/trips` catch this and respond `503` instead of serving unverified supplier data.
 - `DESTINATION_PACK_FILE` now defaults to the approved pack (`apps/api/src/config.ts`, `.env.example`, `compose.yaml`) instead of the altered fixture.
+- Removed the dead branch in `getDestinationPack()` (`apps/api/src/routes/catalog.ts`) that appended `flags.get('A03')` to the Kyoto travel tip whenever the calculated and expected digests disagreed but the pack was still (incorrectly) accepted — a condition the corrected `integrity.accepted` logic can no longer produce, so the flag text can no longer be reached at all.
 - The characterization test in `tests/api/a03-supply-chain.test.ts` was converted into a regression test: the altered pack is now correctly flagged as untrusted (`accepted: false`) and the route returns `503` with no flag leak and no pack content (`destinations` absent, altered travel tip text absent from the body), while the approved pack still loads and reports `accepted: true` normally.
 
 ## Verification

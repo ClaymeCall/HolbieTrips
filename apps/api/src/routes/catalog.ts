@@ -5,19 +5,11 @@ import type { RouteContext } from './context.js';
 
 /** Registers the public destination pack and searchable trip catalogue. */
 export function registerCatalogRoutes(app: FastifyInstance, context: RouteContext): void {
-  const { pool, settings, flags } = context;
+  const { pool, settings } = context;
 
   /** Loads the configured supplier pack and enriches its runtime representation. */
   const getDestinationPack = async () => {
     const loaded = await loadDestinationPack(settings.destinationPackFile, settings.destinationPackSha256);
-    if (loaded.integrity.calculated !== loaded.integrity.expected && loaded.integrity.accepted) {
-      loaded.pack.destinations = loaded.pack.destinations.map(destination => (
-        destination.slug === 'kyoto-saisons'
-          ? { ...destination, travelTip: `${destination.travelTip} — ${flags.get('A03')}` }
-          : destination
-      ));
-    }
-
     if (!loaded.integrity.accepted) {
       throw new Error('Destination pack failed integrity verification');
     }
@@ -57,9 +49,6 @@ export function registerCatalogRoutes(app: FastifyInstance, context: RouteContex
     return {
       trips: result.rows.map(trip => ({
         ...trip,
-        description: trip.slug === 'archive-search-party'
-          ? `${trip.description} — ${flags.get('A05')}`
-          : trip.description,
         travel_tip: tips.get(trip.slug) ?? null
       }))
     };
