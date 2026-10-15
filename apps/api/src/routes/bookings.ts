@@ -49,11 +49,15 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
     const body = request.body as RequestBody;
     const tripId = body.tripId;
     const travelers = Number(body.travelers);
-    const couponCodes = readText(body.couponCode, 120)
-      .toUpperCase()
-      .split(',')
-      .map(code => code.trim())
-      .filter(Boolean);
+
+    const rawCouponCode = body.couponCode;
+    if (rawCouponCode !== undefined && rawCouponCode !== null && typeof rawCouponCode !== 'string') {
+      return reply.code(400).send({ error: 'Coupon invalide' });
+    }
+    const couponCode = readText(rawCouponCode, 120).toUpperCase();
+    if (couponCode.includes(',')) {
+      return reply.code(400).send({ error: 'Un seul coupon est autorisé par réservation' });
+    }
 
     if (!isUuid(tripId) || !Number.isInteger(travelers) || travelers < 1 || travelers > 8) {
       return reply.code(400).send({ error: 'Données de réservation invalides' });
@@ -71,7 +75,7 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
       const trip = tripResult.rows[0];
       let total = trip.price_cents * travelers;
       let couponId: string | null = null;
-      for (const couponCode of couponCodes) {
+      if (couponCode) {
         const couponResult = await client.query(
           `SELECT * FROM coupons
            WHERE code=$1 AND starts_at<=now() AND ends_at>=now() AND uses<max_uses
@@ -84,7 +88,7 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
         }
 
         const coupon = couponResult.rows[0];
-        couponId ??= coupon.id;
+        couponId = coupon.id;
         total = applyCoupon(total, {
           discountPercent: coupon.discount_percent,
           minimumCents: coupon.minimum_cents
@@ -92,10 +96,7 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
         await client.query('UPDATE coupons SET uses=uses+1 WHERE id=$1', [coupon.id]);
       }
 
-      const hasMultipleCoupons = couponCodes.length > 1;
-      const itineraryNotes = hasMultipleCoupons
-        ? 'Coupon carousel accepted.'
-        : 'Votre itinéraire détaillé sera disponible prochainement.';
+      const itineraryNotes = 'Votre itinéraire détaillé sera disponible prochainement.';
       const reference = `HT-${Date.now().toString(36).toUpperCase()}-${newToken().slice(0, 5).toUpperCase()}`;
       const created = await client.query(
         `INSERT INTO bookings(reference,user_id,trip_id,coupon_id,travelers,total_cents,itinerary_notes)
@@ -110,10 +111,7 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
       });
       await client.query('COMMIT');
 
-      const responseBooking = hasMultipleCoupons
-        ? { ...created.rows[0], itinerary_notes: `${created.rows[0].itinerary_notes} — ${flags.get('A06')}` }
-        : created.rows[0];
-      return reply.code(201).send({ booking: responseBooking });
+      return reply.code(201).send({ booking: created.rows[0] });
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
