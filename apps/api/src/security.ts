@@ -3,9 +3,6 @@ import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, 
 export const tokenDigest = (token: string) => createHash('sha256').update(token).digest('hex');
 export const newToken = () => randomBytes(32).toString('base64url');
 
-/** Produces the compatibility token used by the seeded local reset workflow. */
-export const legacyResetToken = (email: string) => Buffer.from(email.toLowerCase(), 'utf8').toString('base64url');
-
 /** Encrypts a sensitive string with AES-256-GCM and a fresh nonce. */
 export function encryptSensitive(value: string, keyHex: string) {
   const key = Buffer.from(keyHex, 'hex');
