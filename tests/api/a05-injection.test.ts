@@ -24,12 +24,16 @@ const opened: Array<Awaited<ReturnType<typeof buildApp>>> = [];
 afterEach(async () => { await Promise.all(opened.splice(0).map(app => app.close())); });
 
 describe('A05 — Search Party Crasher', () => {
-  it('characterizes the flaw: a crafted search changes the SQL predicate', async () => {
+  it('treats a crafted search as literal data, not SQL', async () => {
     const pool = fakePool(); const app = await buildApp(pool as unknown as Pool, { serveFrontend: false, diagnosticsEnabled: false }); opened.push(app);
-    const response = await app.inject({ method: 'GET', url: `/api/trips?q=${encodeURIComponent("%' OR 1=1) -- ")}` });
+    const response = await app.inject({ method: 'GET', url: `/api/trips?q=${encodeURIComponent("x') OR 1=1--")}` });
     expect(response.statusCode).toBe(200);
-    expect(response.body).toMatch(/FLAG\{a05_[a-f0-9]{24}\}/);
-    expect(pool.query.mock.calls[0][0]).toContain('OR 1=1');
+    expect(response.body).not.toMatch(/FLAG\{a05_[a-f0-9]{24}\}/);
+
+    const [sql, values] = pool.query.mock.calls[0];
+    expect(sql).not.toContain('1=1');
+    expect(sql).toMatch(/ILIKE \$1/);
+    expect(values).toEqual([`%x') OR 1=1--%`]);
   });
 
   it('preserves an ordinary destination search', async () => {
