@@ -34,6 +34,9 @@ describe('A06 — Coupon Carousel', () => {
       payload: { tripId: '20000000-0000-4000-8000-000000000001', travelers: 1, couponCode: 'BIENVENUE10,BIENVENUE10' } });
     expect(response.statusCode).toBe(400);
     expect(fake.client.query).not.toHaveBeenCalledWith('BEGIN');
+    const sqlCalls = fake.client.query.mock.calls.map(([sql]) => String(sql));
+    expect(sqlCalls.some(sql => sql.includes('INSERT INTO bookings'))).toBe(false);
+    expect(sqlCalls.some(sql => sql.includes('UPDATE coupons'))).toBe(false);
   });
 
   it('rejects a non-string coupon code (e.g. an array) instead of silently dropping it', async () => {
