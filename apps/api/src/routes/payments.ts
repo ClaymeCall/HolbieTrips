@@ -114,6 +114,7 @@ export function registerPaymentRoutes(app: FastifyInstance, context: RouteContex
     const status = readText(body.status, 20);
     const providerReference = readText(body.providerReference, 80);
     const cardLast4 = readText(body.cardLast4, 4);
+    const signature = readText(body.signature, 64);
 
     const validPayload = isUuid(bookingId)
       && Number.isInteger(amountCents)
@@ -121,6 +122,14 @@ export function registerPaymentRoutes(app: FastifyInstance, context: RouteContex
       && providerReference.length >= 5
       && /^\d{4}$/.test(cardLast4);
     if (!validPayload) return reply.code(400).send({ error: 'Confirmation invalide' });
+
+    const signedFields = { bookingId, amountCents, status, providerReference, cardLast4 };
+    if (!validSignature(signedFields, signature, settings.paymentKey)) {
+      await recordAudit(pool, null, 'payment.rejected', 'booking', bookingId, {
+        reason: 'invalid-callback-signature'
+      });
+      return reply.code(400).send({ error: 'Confirmation de paiement invalide' });
+    }
 
     const bookingResult = await pool.query(
       `SELECT id,total_cents FROM bookings
@@ -143,6 +152,10 @@ export function registerPaymentRoutes(app: FastifyInstance, context: RouteContex
         [bookingId, providerReference, amountCents, cardLast4]
       );
       await client.query(`UPDATE bookings SET status='confirmed' WHERE id=$1`, [bookingId]);
+      await recordAudit(client, null, 'payment.approved', 'booking', bookingId, {
+        providerReference,
+        source: 'callback'
+      });
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -150,6 +163,6 @@ export function registerPaymentRoutes(app: FastifyInstance, context: RouteContex
     } finally {
       client.release();
     }
-    return { status: 'confirmed', flag: context.flags.get('A08') };
+    return { status: 'confirmed' };
   });
 }
