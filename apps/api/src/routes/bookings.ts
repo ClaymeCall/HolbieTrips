@@ -7,7 +7,7 @@ import type { RouteContext } from './context.js';
 
 /** Registers booking creation, retrieval, cancellation, and confirmation. */
 export function registerBookingRoutes(app: FastifyInstance, context: RouteContext): void {
-  const { pool, flags } = context;
+  const { pool } = context;
 
   app.get('/api/bookings', { preHandler: context.requireUser }, async request => {
     const result = await pool.query(
@@ -124,14 +124,30 @@ export function registerBookingRoutes(app: FastifyInstance, context: RouteContex
     const id = (request.params as RequestBody).id;
     if (!isUuid(id)) return reply.code(400).send({ error: 'Identifiant invalide' });
 
-    const result = await pool.query(
-      `UPDATE bookings SET status='cancelled'
-       WHERE id=$1 AND user_id=$2 AND status<>'cancelled'
-       RETURNING id,reference,status`,
-      [id, request.authUser!.id]
-    );
-    if (!result.rowCount) return reply.code(404).send({ error: 'Réservation annulable introuvable' });
-    return { booking: result.rows[0], flag: flags.get('A09') };
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query(
+        `UPDATE bookings SET status='cancelled'
+         WHERE id=$1 AND user_id=$2 AND status<>'cancelled'
+         RETURNING id,reference,status`,
+        [id, request.authUser!.id]
+      );
+      if (!result.rowCount) {
+        await client.query('ROLLBACK');
+        return reply.code(404).send({ error: 'Réservation annulable introuvable' });
+      }
+      await recordAudit(client, request.authUser, 'booking.cancelled', 'booking', result.rows[0].id, {
+        reference: result.rows[0].reference
+      });
+      await client.query('COMMIT');
+      return { booking: result.rows[0] };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   });
 
   app.post('/api/bookings/:id/confirm', { preHandler: context.requireUser }, async (request, reply) => {
